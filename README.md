@@ -1,4 +1,5 @@
-<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/0eb9bab0-8035-4d7a-8183-ccbe5f022151" />
+<img width="1536" height="1024" alt="ChatGPT Image Nov 12, 2025, 08_54_11 AM" src="https://github.com/user-attachments/assets/b72c9f14-9ab7-4c1f-b03a-5853777247b6" />
+
 
 
 ### ⚡️ _Your Intelligent Learning Companion_  
@@ -49,8 +50,8 @@ With adaptive intelligence, deep learning personalization, and conversational AI
 
 > 🚀 Experience innovation — beautifully.
 
- 
- <img width="500" height="500" alt="ChatGPT Image Nov 12, 2025, 04_23_21 PM" src="https://github.com/user-attachments/assets/f81120aa-d56e-4dfd-ab2c-fda6ec614ade" />
+ <img width="480" height="480" alt="image" src="https://github.com/user-attachments/assets/84be3d40-c7e8-4d10-bdb4-618ca6cc9664" />
+
  
 --
 
