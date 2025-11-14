@@ -1,0 +1,393 @@
+
+import React, { useState, useEffect } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Clock, Users, Star, Play, FileText, Zap,
+  Brain, ChevronRight, Sparkles, CheckCircle, Loader2
+} from 'lucide-react';
+import KnowledgeGraph from '../components/3d/KnowledgeGraph';
+
+export default function CourseDetail() {
+  const queryClient = useQueryClient();
+  const urlParams = new URLSearchParams(window.location.search);
+  const courseId = urlParams.get('id');
+  const [user, setUser] = useState(null);
+  const [selectedLesson, setSelectedLesson] = useState(null);
+  const [generatingNotes, setGeneratingNotes] = useState(false);
+
+  useEffect(() => {
+    loadUser();
+  }, []);
+
+  const loadUser = async () => {
+    try {
+      const currentUser = await base44.auth.me();
+      setUser(currentUser);
+    } catch (error) {
+      console.error("User not authenticated");
+    }
+  };
+
+  const { data: course, isLoading } = useQuery({
+    queryKey: ['course', courseId],
+    queryFn: async () => {
+      const courses = await base44.entities.Course.filter({ id: courseId });
+      return courses[0];
+    },
+    enabled: !!courseId
+  });
+
+  const { data: smartNotes = [] } = useQuery({
+    queryKey: ['smartNotes', courseId, user?.id],
+    queryFn: () => base44.entities.SmartNote.filter({ 
+      course_id: courseId, 
+      user_id: user?.id 
+    }),
+    enabled: !!courseId && !!user
+  });
+
+  const { data: flashcards = [] } = useQuery({
+    queryKey: ['flashcards', courseId, user?.id],
+    queryFn: () => base44.entities.Flashcard.filter({ 
+      course_id: courseId,
+      user_id: user?.id 
+    }),
+    enabled: !!courseId && !!user
+  });
+
+  const generateSmartNotesMutation = useMutation({
+    mutationFn: async ({ lesson, content }) => {
+      setGeneratingNotes(true);
+      
+      // AI generation
+      const result = await base44.integrations.Core.InvokeLLM({
+        prompt: `Analyze the following lesson content and generate SmartNotes:
+
+Lesson: ${lesson.title}
+Content: ${content || lesson.content || "No content provided"}
+
+Generate a JSON response with:
+1. key_concepts: Array of exactly 3 key concepts (strings)
+2. practical_examples: Array of exactly 2 real-world examples (strings)
+3. memory_tip: A single memorable tip or mnemonic (string)
+4. seven_day_routine: Array of 7 objects, each with:
+   - day: number (1-7)
+   - task: string (specific daily task)
+   - duration_minutes: number (15-30)
+
+Make it practical, actionable, and optimized for retention.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            key_concepts: { type: "array", items: { type: "string" } },
+            practical_examples: { type: "array", items: { type: "string" } },
+            memory_tip: { type: "string" },
+            seven_day_routine: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  day: { type: "number" },
+                  task: { type: "string" },
+                  duration_minutes: { type: "number" }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Create SmartNote
+      const note = await base44.entities.SmartNote.create({
+        course_id: courseId,
+        lesson_id: lesson.lesson_id,
+        user_id: user.id,
+        ...result
+      });
+
+      return note;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['smartNotes'] });
+      setGeneratingNotes(false);
+    },
+    onError: (error) => {
+      setGeneratingNotes(false);
+      alert(error.message || "Failed to generate SmartNotes");
+    }
+  });
+
+  const allLessons = course?.syllabus?.flatMap(module => 
+    module.lessons?.map(lesson => ({ ...lesson, module_title: module.module_title })) || []
+  ) || [];
+
+  const keyConcepts = smartNotes.flatMap(note => note.key_concepts || []);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#0A0E27] to-[#050810] flex items-center justify-center">
+        <Loader2 className="w-12 h-12 text-[#00E6FF] animate-spin" />
+      </div>
+    );
+  }
+
+  if (!course) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#0A0E27] to-[#050810] flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-white mb-2">Course not found</h2>
+          <p className="text-gray-400">The course you're looking for doesn't exist.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-[#0A0E27] to-[#050810] p-4 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Course Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glassmorphism p-8 rounded-2xl border border-white/10"
+        >
+          <div className="grid lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2">
+              <Badge className="bg-gradient-to-r from-[#00E6FF]/20 to-[#8A2BE2]/20 border border-[#00E6FF]/50 text-[#00E6FF] mb-4">
+                {course.difficulty}
+              </Badge>
+              <h1 className="text-4xl font-bold text-white mb-4">{course.title}</h1>
+              <p className="text-gray-300 text-lg mb-6">{course.description}</p>
+              
+              <div className="flex flex-wrap gap-2 mb-6">
+                {course.tags?.map((tag, idx) => (
+                  <Badge key={idx} variant="outline" className="border-[#00E6FF]/30 text-[#00E6FF]">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="glassmorphism p-4 rounded-lg">
+                  <Clock className="w-5 h-5 text-[#00E6FF] mb-2" />
+                  <div className="text-2xl font-bold text-white">{course.estimated_hours}h</div>
+                  <div className="text-xs text-gray-400">Duration</div>
+                </div>
+                <div className="glassmorphism p-4 rounded-lg">
+                  <Users className="w-5 h-5 text-[#8A2BE2] mb-2" />
+                  <div className="text-2xl font-bold text-white">{course.enrollment_count}</div>
+                  <div className="text-xs text-gray-400">Enrolled</div>
+                </div>
+                <div className="glassmorphism p-4 rounded-lg">
+                  <Star className="w-5 h-5 text-yellow-400 mb-2" />
+                  <div className="text-2xl font-bold text-white">{course.rating}</div>
+                  <div className="text-xs text-gray-400">Rating</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center">
+              <div className="glassmorphism p-6 rounded-xl w-full">
+                <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
+                <div className="space-y-3">
+                  <Button className="w-full bg-gradient-to-r from-[#00E6FF] to-[#8A2BE2] hover:from-[#00E6FF]/90 hover:to-[#8A2BE2]/90">
+                    <Play className="w-4 h-4 mr-2" />
+                    Start Learning
+                  </Button>
+                  <Button variant="outline" className="w-full border-[#00E6FF]/30 text-[#00E6FF] hover:bg-[#00E6FF]/10">
+                    <Brain className="w-4 h-4 mr-2" />
+                    Ask AI Trainer
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Main Content Tabs */}
+        <Tabs defaultValue="syllabus" className="space-y-6">
+          <TabsList className="glassmorphism border border-white/10">
+            <TabsTrigger value="syllabus">Syllabus</TabsTrigger>
+            <TabsTrigger value="notes">SmartNotes ({smartNotes.length})</TabsTrigger>
+            <TabsTrigger value="flashcards">Flashcards ({flashcards.length})</TabsTrigger>
+            <TabsTrigger value="knowledge">Knowledge Graph</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="syllabus" className="space-y-4">
+            {course.syllabus?.map((module, moduleIdx) => (
+              <motion.div
+                key={module.module_id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: moduleIdx * 0.1 }}
+              >
+                <Card className="glassmorphism border-white/10">
+                  <CardHeader>
+                    <CardTitle className="text-white flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-[#00E6FF] to-[#8A2BE2] flex items-center justify-center text-sm">
+                        {moduleIdx + 1}
+                      </div>
+                      {module.module_title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {module.learning_objectives && module.learning_objectives.length > 0 && (
+                      <div className="mb-4">
+                        <p className="text-sm text-gray-400 mb-2">Learning Objectives:</p>
+                        <ul className="list-disc list-inside space-y-1">
+                          {module.learning_objectives.map((obj, idx) => (
+                            <li key={idx} className="text-sm text-gray-300">{obj}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {module.lessons?.map((lesson, lessonIdx) => (
+                      <div
+                        key={lesson.lesson_id}
+                        className="glassmorphism p-4 rounded-lg hover-glow cursor-pointer"
+                        onClick={() => setSelectedLesson(lesson)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3 flex-1">
+                            <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center">
+                              {lesson.type === 'video' && <Play className="w-5 h-5 text-[#00E6FF]" />}
+                              {lesson.type === 'reading' && <FileText className="w-5 h-5 text-[#8A2BE2]" />}
+                              {lesson.type === 'quiz' && <Zap className="w-5 h-5 text-yellow-400" />}
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-white">{lesson.title}</h4>
+                              <p className="text-xs text-gray-400">{lesson.duration_minutes} minutes • {lesson.type}</p>
+                            </div>
+                          </div>
+                          
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-[#00E6FF]/30 text-[#00E6FF] hover:bg-[#00E6FF]/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              generateSmartNotesMutation.mutate({ 
+                                lesson, 
+                                content: lesson.content || lesson.transcript 
+                              });
+                            }}
+                            disabled={generatingNotes}
+                          >
+                            {generatingNotes ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <>
+                                <Sparkles className="w-4 h-4 mr-1" />
+                                Generate Notes
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </TabsContent>
+
+          <TabsContent value="notes">
+            <div className="grid md:grid-cols-2 gap-6">
+              {smartNotes.map((note, idx) => (
+                <motion.div
+                  key={note.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.1 }}
+                >
+                  <Card className="glassmorphism border-white/10">
+                    <CardHeader>
+                      <CardTitle className="text-white flex items-center gap-2">
+                        <FileText className="w-5 h-5 text-[#00E6FF]" />
+                        Lesson Notes
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <h4 className="text-sm font-semibold text-[#00E6FF] mb-2">Key Concepts</h4>
+                        <ul className="space-y-1">
+                          {note.key_concepts?.map((concept, i) => (
+                            <li key={i} className="text-gray-300 text-sm flex items-start gap-2">
+                              <CheckCircle className="w-4 h-4 text-[#00E6FF] mt-0.5 flex-shrink-0" />
+                              {concept}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h4 className="text-sm font-semibold text-[#8A2BE2] mb-2">Practical Examples</h4>
+                        <ul className="space-y-1">
+                          {note.practical_examples?.map((example, i) => (
+                            <li key={i} className="text-gray-300 text-sm">{example}</li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {note.memory_tip && (
+                        <div className="glassmorphism p-3 rounded-lg">
+                          <p className="text-sm text-yellow-400 font-semibold mb-1">💡 Memory Tip</p>
+                          <p className="text-gray-300 text-sm">{note.memory_tip}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+
+              {smartNotes.length === 0 && (
+                <div className="col-span-2 text-center py-12 glassmorphism rounded-2xl">
+                  <Sparkles className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                  <p className="text-gray-400">No SmartNotes yet. Generate them from lessons!</p>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="flashcards">
+            <div className="text-center py-12 glassmorphism rounded-2xl">
+              <Zap className="w-16 h-16 text-[#00E6FF] mx-auto mb-4" />
+              <h3 className="text-2xl font-bold text-white mb-2">FlashCore</h3>
+              <p className="text-gray-400 mb-6">
+                {flashcards.length} flashcards available for this course
+              </p>
+              <Button className="bg-gradient-to-r from-[#00E6FF] to-[#8A2BE2]">
+                Start FlashCore Session
+              </Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="knowledge">
+            <Card className="glassmorphism border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white">Interactive Knowledge Graph</CardTitle>
+                <p className="text-sm text-gray-400">3D visualization of course concepts</p>
+              </CardHeader>
+              <CardContent>
+                <KnowledgeGraph
+                  concepts={keyConcepts.length > 0 ? keyConcepts : ['Neural Networks', 'Machine Learning', 'Deep Learning', 'AI Ethics', 'Data Science']}
+                  onNodeClick={(concept) => console.log('Clicked:', concept)}
+                  className="h-96"
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}
+

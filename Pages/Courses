@@ -1,0 +1,167 @@
+import React, { useState } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useQuery } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Search, Filter, Plus } from 'lucide-react';
+import CourseCard3D from '../components/3d/CourseCard3D';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+export default function Courses() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [difficultyFilter, setDifficultyFilter] = useState('all');
+  const [user, setUser] = useState(null);
+
+  React.useEffect(() => {
+    loadUser();
+  }, []);
+
+  const loadUser = async () => {
+    try {
+      const currentUser = await base44.auth.me();
+      setUser(currentUser);
+    } catch (error) {
+      console.error("User not authenticated");
+    }
+  };
+
+  const { data: courses = [], isLoading } = useQuery({
+    queryKey: ['courses'],
+    queryFn: () => base44.entities.Course.filter({ is_published: true }, '-created_date'),
+    initialData: []
+  });
+
+  const filteredCourses = courses.filter(course => {
+    const matchesSearch = !searchQuery || 
+      course.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      course.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      course.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const matchesDifficulty = difficultyFilter === 'all' || course.difficulty === difficultyFilter;
+    
+    return matchesSearch && matchesDifficulty;
+  });
+
+  const uniqueTags = [...new Set(courses.flatMap(c => c.tags || []))].slice(0, 10);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-[#0A0E27] to-[#050810] p-4 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+        >
+          <div>
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E6FF] to-[#8A2BE2]">
+                Explore
+              </span> Courses
+            </h1>
+            <p className="text-gray-400">GPU-accelerated learning experiences</p>
+          </div>
+
+          {user?.role === 'mentor' || user?.role === 'admin' ? (
+            <Button
+              className="bg-gradient-to-r from-[#00E6FF] to-[#8A2BE2] hover:from-[#00E6FF]/90 hover:to-[#8A2BE2]/90"
+              onClick={() => window.alert('Course creation coming soon!')}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Course
+            </Button>
+          ) : null}
+        </motion.div>
+
+        {/* Search and Filters */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="glassmorphism p-6 rounded-2xl border border-white/10"
+        >
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Input
+                placeholder="Search courses, topics, or tags..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-gray-500"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+                <SelectTrigger className="w-40 bg-white/5 border-white/10 text-white">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Difficulty" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Levels</SelectItem>
+                  <SelectItem value="beginner">Beginner</SelectItem>
+                  <SelectItem value="intermediate">Intermediate</SelectItem>
+                  <SelectItem value="advanced">Advanced</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Popular Tags */}
+          {uniqueTags.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="text-sm text-gray-400 mr-2">Popular:</span>
+              {uniqueTags.map((tag, idx) => (
+                <Badge
+                  key={idx}
+                  variant="outline"
+                  className="cursor-pointer border-[#00E6FF]/30 text-[#00E6FF] hover:bg-[#00E6FF]/10"
+                  onClick={() => setSearchQuery(tag)}
+                >
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </motion.div>
+
+        {/* Course Grid */}
+        {isLoading ? (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="glassmorphism h-96 rounded-2xl animate-pulse" />
+            ))}
+          </div>
+        ) : filteredCourses.length > 0 ? (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filteredCourses.map((course, idx) => (
+              <CourseCard3D key={course.id} course={course} index={idx} />
+            ))}
+          </div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-20"
+          >
+            <div className="glassmorphism inline-block p-12 rounded-3xl">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#00E6FF]/20 to-[#8A2BE2]/20 flex items-center justify-center mx-auto mb-4">
+                <Search className="w-10 h-10 text-[#00E6FF]" />
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-2">No courses found</h3>
+              <p className="text-gray-400">Try adjusting your search or filters</p>
+            </div>
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
+}

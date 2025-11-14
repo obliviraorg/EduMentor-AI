@@ -1,0 +1,54 @@
+{
+  "name": "StudySession",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "User conducting the study session"
+    },
+    "course_id": {
+      "type": "string",
+      "description": "Course being studied"
+    },
+    "lesson_id": {
+      "type": "string",
+      "description": "Specific lesson (optional)"
+    },
+    "session_type": {
+      "type": "string",
+      "enum": [
+        "video",
+        "reading",
+        "flashcards",
+        "quiz",
+        "ai_chat"
+      ],
+      "description": "Type of study activity"
+    },
+    "duration_minutes": {
+      "type": "number",
+      "description": "Session duration"
+    },
+    "progress_percentage": {
+      "type": "number",
+      "description": "Completion percentage for this session"
+    },
+    "engagement_score": {
+      "type": "number",
+      "description": "AI-calculated engagement metric 0-100"
+    },
+    "notes_taken": {
+      "type": "boolean",
+      "default": false
+    },
+    "completed": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "user_id",
+    "course_id",
+    "session_type"
+  ]
+}

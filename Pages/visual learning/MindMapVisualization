@@ -1,0 +1,157 @@
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+
+export default function MindMapVisualization({ mindmap }) {
+  const [hoveredBranch, setHoveredBranch] = useState(null);
+
+  if (!mindmap) return null;
+
+  const { central_topic, branches = [] } = mindmap;
+
+  return (
+    <div className="relative w-full h-[600px] bg-gradient-to-br from-[#0A0E27] to-[#1A1E3F] rounded-xl overflow-hidden p-8">
+      <svg width="100%" height="100%" viewBox="0 0 1000 600" className="absolute inset-0">
+        {/* Draw connections from center to branches */}
+        {branches.map((branch, idx) => {
+          const angle = (idx * 2 * Math.PI) / branches.length;
+          const branchX = 500 + 250 * Math.cos(angle);
+          const branchY = 300 + 200 * Math.sin(angle);
+
+          return (
+            <g key={idx}>
+              <motion.line
+                x1="500"
+                y1="300"
+                x2={branchX}
+                y2={branchY}
+                stroke="#00E6FF"
+                strokeWidth="3"
+                opacity="0.3"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 1, delay: idx * 0.1 }}
+              />
+
+              {/* Draw sub-connections */}
+              {branch.subbranches?.map((_, subIdx) => {
+                const subAngle = angle + (subIdx - branch.subbranches.length / 2) * 0.3;
+                const subX = branchX + 150 * Math.cos(subAngle);
+                const subY = branchY + 100 * Math.sin(subAngle);
+
+                return (
+                  <motion.line
+                    key={`sub-${idx}-${subIdx}`}
+                    x1={branchX}
+                    y1={branchY}
+                    x2={subX}
+                    y2={subY}
+                    stroke="#8A2BE2"
+                    strokeWidth="2"
+                    opacity="0.2"
+                    initial={{ pathLength: 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ duration: 0.8, delay: 0.5 + idx * 0.1 + subIdx * 0.05 }}
+                  />
+                );
+              })}
+            </g>
+          );
+        })}
+
+        {/* Central topic */}
+        <g>
+          <motion.circle
+            cx="500"
+            cy="300"
+            r="80"
+            fill="url(#centralGradient)"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 200 }}
+            filter="drop-shadow(0 0 20px #00E6FF)"
+          />
+          <foreignObject x="420" y="270" width="160" height="60">
+            <div className="flex items-center justify-center h-full text-center">
+              <p className="text-white font-bold text-sm px-2">{central_topic}</p>
+            </div>
+          </foreignObject>
+        </g>
+
+        {/* Branch nodes */}
+        {branches.map((branch, idx) => {
+          const angle = (idx * 2 * Math.PI) / branches.length;
+          const branchX = 500 + 250 * Math.cos(angle);
+          const branchY = 300 + 200 * Math.sin(angle);
+
+          return (
+            <g key={idx}>
+              <motion.circle
+                cx={branchX}
+                cy={branchY}
+                r="60"
+                fill={idx % 2 === 0 ? '#00E6FF' : '#8A2BE2'}
+                opacity="0.8"
+                initial={{ scale: 0 }}
+                animate={{ scale: hoveredBranch === idx ? 1.2 : 1 }}
+                transition={{ type: 'spring', delay: 0.3 + idx * 0.1 }}
+                onMouseEnter={() => setHoveredBranch(idx)}
+                onMouseLeave={() => setHoveredBranch(null)}
+                style={{ cursor: 'pointer' }}
+                filter={`drop-shadow(0 0 15px ${idx % 2 === 0 ? '#00E6FF' : '#8A2BE2'})`}
+              />
+              <foreignObject x={branchX - 50} y={branchY - 20} width="100" height="40">
+                <div className="flex items-center justify-center h-full text-center">
+                  <p className="text-white font-semibold text-xs px-1">{branch.label}</p>
+                </div>
+              </foreignObject>
+
+              {/* Sub-branches */}
+              {branch.subbranches?.map((subbranch, subIdx) => {
+                const subAngle = angle + (subIdx - branch.subbranches.length / 2) * 0.3;
+                const subX = branchX + 150 * Math.cos(subAngle);
+                const subY = branchY + 100 * Math.sin(subAngle);
+
+                return (
+                  <g key={`sub-${idx}-${subIdx}`}>
+                    <motion.circle
+                      cx={subX}
+                      cy={subY}
+                      r="35"
+                      fill="#1A1E3F"
+                      stroke={idx % 2 === 0 ? '#00E6FF' : '#8A2BE2'}
+                      strokeWidth="2"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.5 + idx * 0.1 + subIdx * 0.05 }}
+                    />
+                    <foreignObject x={subX - 30} y={subY - 15} width="60" height="30">
+                      <div className="flex items-center justify-center h-full text-center">
+                        <p className="text-gray-300 text-xs px-1 leading-tight">{subbranch}</p>
+                      </div>
+                    </foreignObject>
+                  </g>
+                );
+              })}
+            </g>
+          );
+        })}
+
+        <defs>
+          <radialGradient id="centralGradient">
+            <stop offset="0%" stopColor="#00E6FF" />
+            <stop offset="100%" stopColor="#8A2BE2" />
+          </radialGradient>
+        </defs>
+      </svg>
+
+      {/* Legend */}
+      <div className="absolute bottom-4 left-4 glassmorphism p-3 rounded-lg">
+        <p className="text-xs text-gray-400 mb-2">Hover over nodes to explore</p>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-gradient-to-r from-[#00E6FF] to-[#8A2BE2]" />
+          <span className="text-xs text-gray-300">Central Topic</span>
+        </div>
+      </div>
+    </div>
+  );
+}

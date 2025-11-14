@@ -1,0 +1,286 @@
+import React, { useState, useEffect } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useMutation } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { 
+  User, Bell, Settings,
+  Calendar, Clock, Target
+} from 'lucide-react';
+
+export default function Profile() {
+  const [user, setUser] = useState(null);
+  const [editMode, setEditMode] = useState(false);
+  const [formData, setFormData] = useState({});
+
+  useEffect(() => {
+    loadUser();
+  }, []);
+
+  const loadUser = async () => {
+    try {
+      const currentUser = await base44.auth.me();
+      setUser(currentUser);
+      setFormData({
+        full_name: currentUser.full_name || '',
+        bio: currentUser.bio || '',
+        study_preferences: currentUser.study_preferences || {
+          daily_goal_minutes: 60,
+          preferred_study_time: 'evening',
+          difficulty_preference: 'intermediate'
+        }
+      });
+    } catch (error) {
+      base44.auth.redirectToLogin();
+    }
+  };
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data) => {
+      await base44.auth.updateMe(data);
+      return data;
+    },
+    onSuccess: () => {
+      loadUser();
+      setEditMode(false);
+      alert('Profile updated successfully!');
+    },
+    onError: (error) => {
+      alert('Failed to update profile: ' + error.message);
+    }
+  });
+
+  const addExamDateMutation = useMutation({
+    mutationFn: async (examData) => {
+      const currentExams = user.exam_dates || [];
+      await base44.auth.updateMe({
+        exam_dates: [...currentExams, examData]
+      });
+    },
+    onSuccess: () => {
+      loadUser();
+      alert('Exam date added!');
+    }
+  });
+
+  const handleSave = () => {
+    updateProfileMutation.mutate(formData);
+  };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#0A0E27] to-[#050810] flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-[#0A0E27] to-[#050810] p-4 md:p-8">
+      <div className="max-w-6xl mx-auto space-y-8">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glassmorphism p-8 rounded-2xl border border-white/10"
+        >
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div className="flex items-center gap-6">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#00E6FF] to-[#8A2BE2] flex items-center justify-center text-3xl font-bold text-white">
+                {user.full_name?.[0] || 'U'}
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-white mb-2">{user.full_name || 'User'}</h1>
+                <p className="text-gray-400">{user.email}</p>
+                <Badge className="mt-2 bg-gradient-to-r from-[#00E6FF]/20 to-[#8A2BE2]/20 border border-[#00E6FF]/50 text-[#00E6FF]">
+                  {user.role}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Tabs */}
+        <Tabs defaultValue="profile" className="space-y-6">
+          <TabsList className="glassmorphism border border-white/10">
+            <TabsTrigger value="profile">
+              <User className="w-4 h-4 mr-2" />
+              Profile
+            </TabsTrigger>
+            <TabsTrigger value="preferences">
+              <Settings className="w-4 h-4 mr-2" />
+              Preferences
+            </TabsTrigger>
+            <TabsTrigger value="exams">
+              <Calendar className="w-4 h-4 mr-2" />
+              Exam Schedule
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="profile">
+            <Card className="glassmorphism border-white/10">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="text-white">Profile Information</CardTitle>
+                  <Button
+                    variant="outline"
+                    className="border-[#00E6FF]/30 text-[#00E6FF]"
+                    onClick={() => editMode ? handleSave() : setEditMode(true)}
+                  >
+                    {editMode ? 'Save Changes' : 'Edit Profile'}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label className="text-gray-400">Full Name</Label>
+                  <Input
+                    value={formData.full_name || ''}
+                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                    disabled={!editMode}
+                    className="bg-white/5 border-white/10 text-white mt-2"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-400">Email</Label>
+                  <Input
+                    value={user.email}
+                    disabled
+                    className="bg-white/5 border-white/10 text-gray-500 mt-2"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-400">Bio</Label>
+                  <Input
+                    value={formData.bio || ''}
+                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                    disabled={!editMode}
+                    placeholder="Tell us about yourself..."
+                    className="bg-white/5 border-white/10 text-white mt-2"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="preferences">
+            <Card className="glassmorphism border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white">Study Preferences</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <Label className="text-gray-400 mb-2 block">Daily Study Goal (minutes)</Label>
+                  <Input
+                    type="number"
+                    value={formData.study_preferences?.daily_goal_minutes || 60}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      study_preferences: {
+                        ...formData.study_preferences,
+                        daily_goal_minutes: parseInt(e.target.value)
+                      }
+                    })}
+                    className="bg-white/5 border-white/10 text-white"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-gray-400 mb-2 block">Preferred Study Time</Label>
+                  <Select
+                    value={formData.study_preferences?.preferred_study_time || 'evening'}
+                    onValueChange={(value) => setFormData({
+                      ...formData,
+                      study_preferences: {
+                        ...formData.study_preferences,
+                        preferred_study_time: value
+                      }
+                    })}
+                  >
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="morning">Morning</SelectItem>
+                      <SelectItem value="afternoon">Afternoon</SelectItem>
+                      <SelectItem value="evening">Evening</SelectItem>
+                      <SelectItem value="night">Night</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-gray-400 mb-2 block">Difficulty Preference</Label>
+                  <Select
+                    value={formData.study_preferences?.difficulty_preference || 'intermediate'}
+                    onValueChange={(value) => setFormData({
+                      ...formData,
+                      study_preferences: {
+                        ...formData.study_preferences,
+                        difficulty_preference: value
+                      }
+                    })}
+                  >
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="beginner">Beginner</SelectItem>
+                      <SelectItem value="intermediate">Intermediate</SelectItem>
+                      <SelectItem value="advanced">Advanced</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button
+                  onClick={handleSave}
+                  className="w-full bg-gradient-to-r from-[#00E6FF] to-[#8A2BE2]"
+                >
+                  Save Preferences
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="exams">
+            <Card className="glassmorphism border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white">Upcoming Exams</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {user.exam_dates?.length > 0 ? (
+                  user.exam_dates.map((exam, idx) => (
+                    <div key={idx} className="glassmorphism p-4 rounded-lg flex items-center justify-between">
+                      <div>
+                        <h4 className="font-semibold text-white">{exam.exam_name}</h4>
+                        <p className="text-sm text-gray-400">{exam.exam_date}</p>
+                      </div>
+                      <Calendar className="w-5 h-5 text-[#00E6FF]" />
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <Calendar className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                    <p className="text-gray-400">No upcoming exams scheduled</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}

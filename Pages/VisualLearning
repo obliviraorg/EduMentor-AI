@@ -1,0 +1,491 @@
+import React, { useState } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  Upload, FileText, Loader2, Brain, Zap, 
+  Network, Image as ImageIcon, CheckCircle, Download
+} from 'lucide-react';
+import MindMapVisualization from '../components/visuallearning/MindMapVisualization';
+import FlashcardGrid from '../components/visuallearning/FlashcardGrid';
+import DiagramVisualizer from '../components/visuallearning/DiagramVisualizer';
+
+export default function VisualLearning() {
+  const [user, setUser] = useState(null);
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [processing, setProcessing] = useState(false);
+  const [generatedContent, setGeneratedContent] = useState(null);
+
+  React.useEffect(() => {
+    loadUser();
+  }, []);
+
+  const loadUser = async () => {
+    try {
+      const currentUser = await base44.auth.me();
+      setUser(currentUser);
+    } catch (error) {
+      base44.auth.redirectToLogin();
+    }
+  };
+
+  const { data: savedNotes = [] } = useQuery({
+    queryKey: ['visualNotes', user?.id],
+    queryFn: () => base44.entities.VisualNote.filter({ user_id: user?.id }, '-created_date'),
+    enabled: !!user,
+    initialData: []
+  });
+
+  const processNotesMutation = useMutation({
+    mutationFn: async (file) => {
+      setProcessing(true);
+
+      // Upload file
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+
+      // Extract text from file
+      const extractedData = await base44.integrations.Core.ExtractDataFromUploadedFile({
+        file_url,
+        json_schema: {
+          type: "object",
+          properties: {
+            content: { type: "string" }
+          }
+        }
+      });
+
+      const noteContent = extractedData.output?.content || "No content extracted";
+
+      // Generate comprehensive learning materials using AI
+      const result = await base44.integrations.Core.InvokeLLM({
+        prompt: `Analyze the following notes and generate comprehensive learning materials:
+
+NOTES CONTENT:
+${noteContent}
+
+Generate a JSON response with:
+
+1. summary: A concise 3-4 sentence summary of the key points
+2. detailed_notes: Array of 5-7 key points with explanations (each as object with "title" and "description")
+3. flashcards: Array of 8-10 flashcard objects with "question" and "answer"
+4. mindmap: Object with:
+   - central_topic: string (main topic)
+   - branches: array of objects with "label" and "subbranches" (array of strings)
+5. diagrams: Array of 2-3 diagram objects with:
+   - title: string
+   - type: "flowchart" | "concept_map" | "hierarchy"
+   - nodes: array of objects with "id", "label", "type" (start/process/end)
+   - connections: array of objects with "from" and "to" (node ids)
+6. visual_concepts: Array of 3-5 objects with "concept" and "visual_description" (how to visualize it)
+
+Make everything practical, memorable, and optimized for visual learning.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            summary: { type: "string" },
+            detailed_notes: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string" }
+                }
+              }
+            },
+            flashcards: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  question: { type: "string" },
+                  answer: { type: "string" }
+                }
+              }
+            },
+            mindmap: {
+              type: "object",
+              properties: {
+                central_topic: { type: "string" },
+                branches: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      label: { type: "string" },
+                      subbranches: {
+                        type: "array",
+                        items: { type: "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            diagrams: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  type: { type: "string" },
+                  nodes: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        label: { type: "string" },
+                        type: { type: "string" }
+                      }
+                    }
+                  },
+                  connections: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        from: { type: "string" },
+                        to: { type: "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            visual_concepts: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  concept: { type: "string" },
+                  visual_description: { type: "string" }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Save to database
+      const saved = await base44.entities.VisualNote.create({
+        user_id: user.id,
+        file_url,
+        original_content: noteContent,
+        ...result
+      });
+
+      return { ...result, id: saved.id };
+    },
+    onSuccess: (data) => {
+      setGeneratedContent(data);
+      setProcessing(false);
+      setUploadedFile(null);
+    },
+    onError: (error) => {
+      setProcessing(false);
+      alert('Failed to process notes: ' + error.message);
+    }
+  });
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadedFile(file);
+    }
+  };
+
+  const handleProcess = () => {
+    if (uploadedFile) {
+      processNotesMutation.mutate(uploadedFile);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-[#0A0E27] to-[#050810] p-4 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center"
+        >
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E6FF] to-[#8A2BE2]">
+              Visual Learning Studio
+            </span>
+          </h1>
+          <p className="text-gray-400">Upload notes, generate flashcards, mindmaps, and visual diagrams</p>
+        </motion.div>
+
+        {/* Upload Section */}
+        {!generatedContent && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <Card className="glassmorphism border-white/10">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Upload className="w-5 h-5 text-[#00E6FF]" />
+                  Upload Your Notes
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="border-2 border-dashed border-white/20 rounded-xl p-12 text-center hover:border-[#00E6FF]/50 transition-colors">
+                  <input
+                    type="file"
+                    id="file-upload"
+                    className="hidden"
+                    accept=".pdf,.txt,.doc,.docx,.png,.jpg,.jpeg"
+                    onChange={handleFileUpload}
+                    disabled={processing}
+                  />
+                  <label htmlFor="file-upload" className="cursor-pointer">
+                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#00E6FF]/20 to-[#8A2BE2]/20 flex items-center justify-center mx-auto mb-4">
+                      <FileText className="w-10 h-10 text-[#00E6FF]" />
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">
+                      {uploadedFile ? uploadedFile.name : 'Choose a file to upload'}
+                    </h3>
+                    <p className="text-gray-400 mb-4">
+                      Supports PDF, TXT, DOC, DOCX, PNG, JPG
+                    </p>
+                    {!uploadedFile && (
+                      <Button variant="outline" className="border-[#00E6FF]/30 text-[#00E6FF]">
+                        Browse Files
+                      </Button>
+                    )}
+                  </label>
+                </div>
+
+                {uploadedFile && (
+                  <div className="flex items-center justify-between glassmorphism p-4 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <FileText className="w-5 h-5 text-[#00E6FF]" />
+                      <div>
+                        <p className="text-white font-medium">{uploadedFile.name}</p>
+                        <p className="text-xs text-gray-400">{(uploadedFile.size / 1024).toFixed(2)} KB</p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={handleProcess}
+                      disabled={processing}
+                      className="bg-gradient-to-r from-[#00E6FF] to-[#8A2BE2]"
+                    >
+                      {processing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Processing...
+                        </>
+                       ) : (
+                        <>
+                          <Brain className="w-4 h-4 mr-2" />
+                          Generate Learning Materials
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+
+                <div className="grid md:grid-cols-4 gap-4 pt-4 border-t border-white/10">
+                  <div className="text-center">
+                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#00E6FF]/20 to-[#8A2BE2]/20 flex items-center justify-center mx-auto mb-2">
+                      <FileText className="w-6 h-6 text-[#00E6FF]" />
+                    </div>
+                    <p className="text-sm text-gray-300">Smart Summary</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#8A2BE2]/20 to-[#00E6FF]/20 flex items-center justify-center mx-auto mb-2">
+                      <Zap className="w-6 h-6 text-[#8A2BE2]" />
+                    </div>
+                    <p className="text-sm text-gray-300">Flashcards</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#00E6FF]/20 to-[#8A2BE2]/20 flex items-center justify-center mx-auto mb-2">
+                      <Network className="w-6 h-6 text-[#00E6FF]" />
+                    </div>
+                    <p className="text-sm text-gray-300">Mind Maps</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#8A2BE2]/20 to-[#00E6FF]/20 flex items-center justify-center mx-auto mb-2">
+                      <ImageIcon className="w-6 h-6 text-[#8A2BE2]" />
+                    </div>
+                    <p className="text-sm text-gray-300">Visual Diagrams</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Generated Content */}
+        {generatedContent && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="space-y-6"
+          >
+            <div className="flex justify-between items-center">
+              <Badge className="bg-gradient-to-r from-[#00E6FF]/20 to-[#8A2BE2]/20 border border-[#00E6FF]/50 text-[#00E6FF] px-4 py-2">
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Learning Materials Generated
+              </Badge>
+              <Button
+                variant="outline"
+                className="border-[#00E6FF]/30 text-[#00E6FF]"
+                onClick={() => setGeneratedContent(null)}
+              >
+                Upload New Notes
+              </Button>
+            </div>
+
+            <Tabs defaultValue="summary" className="space-y-6">
+              <TabsList className="glassmorphism border border-white/10">
+                <TabsTrigger value="summary">Summary & Notes</TabsTrigger>
+                <TabsTrigger value="flashcards">Flashcards</TabsTrigger>
+                <TabsTrigger value="mindmap">Mind Map</TabsTrigger>
+                <TabsTrigger value="diagrams">Diagrams</TabsTrigger>
+                <TabsTrigger value="visual">Visual Concepts</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="summary">
+                <div className="space-y-6">
+                  <Card className="glassmorphism border-white/10">
+                    <CardHeader>
+                      <CardTitle className="text-white">Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-gray-300 leading-relaxed">{generatedContent.summary}</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="glassmorphism border-white/10">
+                    <CardHeader>
+                      <CardTitle className="text-white">Detailed Notes</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {generatedContent.detailed_notes?.map((note, idx) => (
+                        <motion.div
+                          key={idx}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.1 }}
+                          className="glassmorphism p-4 rounded-lg"
+                        >
+                          <h4 className="font-bold text-[#00E6FF] mb-2 flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-[#00E6FF]/20 flex items-center justify-center text-xs">
+                              {idx + 1}
+                            </div>
+                            {note.title}
+                          </h4>
+                          <p className="text-gray-300 text-sm">{note.description}</p>
+                        </motion.div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="flashcards">
+                <FlashcardGrid flashcards={generatedContent.flashcards || []} />
+              </TabsContent>
+
+              <TabsContent value="mindmap">
+                <Card className="glassmorphism border-white/10">
+                  <CardHeader>
+                    <CardTitle className="text-white flex items-center gap-2">
+                      <Network className="w-5 h-5 text-[#00E6FF]" />
+                      Interactive Mind Map
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <MindMapVisualization mindmap={generatedContent.mindmap} />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="diagrams">
+                <div className="space-y-6">
+                  {generatedContent.diagrams?.map((diagram, idx) => (
+                    <DiagramVisualizer key={idx} diagram={diagram} index={idx} />
+                  ))}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="visual">
+                <div className="grid md:grid-cols-2 gap-6">
+                  {generatedContent.visual_concepts?.map((concept, idx) => (
+                    <motion.div
+                      key={idx}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: idx * 0.1 }}
+                    >
+                      <Card className="glassmorphism border-white/10 h-full">
+                        <CardHeader>
+                          <CardTitle className="text-white flex items-center gap-2">
+                            <ImageIcon className="w-5 h-5 text-[#8A2BE2]" />
+                            {concept.concept}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="glassmorphism p-6 rounded-lg mb-4 text-center">
+                            <div className="w-full h-40 rounded-lg bg-gradient-to-br from-[#00E6FF]/10 to-[#8A2BE2]/10 flex items-center justify-center">
+                              <ImageIcon className="w-16 h-16 text-[#00E6FF]/50" />
+                            </div>
+                          </div>
+                          <p className="text-gray-300 text-sm">{concept.visual_description}</p>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              </TabsContent>
+            </Tabs>
+          </motion.div>
+        )}
+
+        {/* Saved Notes History */}
+        {savedNotes.length > 0 && !generatedContent && (
+          <Card className="glassmorphism border-white/10">
+            <CardHeader>
+              <CardTitle className="text-white">Previously Generated Learning Materials</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {savedNotes.slice(0, 6).map((note, idx) => (
+                  <motion.div
+                    key={note.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    className="glassmorphism p-4 rounded-lg hover-glow cursor-pointer"
+                    onClick={() => setGeneratedContent(note)}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#00E6FF]/20 to-[#8A2BE2]/20 flex items-center justify-center flex-shrink-0">
+                        <FileText className="w-5 h-5 text-[#00E6FF]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-medium truncate">{note.mindmap?.central_topic || 'Learning Material'}</p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {new Date(note.created_date).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}

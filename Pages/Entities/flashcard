@@ -1,0 +1,66 @@
+{
+  "name": "Flashcard",
+  "type": "object",
+  "properties": {
+    "course_id": {
+      "type": "string",
+      "description": "Associated course ID"
+    },
+    "lesson_id": {
+      "type": "string",
+      "description": "Associated lesson ID (optional)"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "User who created/generated this card"
+    },
+    "question": {
+      "type": "string",
+      "description": "Front of the flashcard"
+    },
+    "answer": {
+      "type": "string",
+      "description": "Back of the flashcard"
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": [
+        "easy",
+        "medium",
+        "hard"
+      ],
+      "default": "medium"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "mastery_level": {
+      "type": "number",
+      "default": 0,
+      "description": "Spaced repetition score 0-100"
+    },
+    "last_reviewed": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last time card was studied"
+    },
+    "review_count": {
+      "type": "number",
+      "default": 0
+    },
+    "next_review_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Optimal next review date"
+    }
+  },
+  "required": [
+    "course_id",
+    "user_id",
+    "question",
+    "answer"
+  ]
+}

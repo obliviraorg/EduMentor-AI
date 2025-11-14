@@ -1,0 +1,332 @@
+import React, { useState, useEffect } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { 
+  Zap, ChevronLeft, ChevronRight, RotateCcw, 
+  CheckCircle, XCircle, Trophy, Target 
+} from 'lucide-react';
+
+export default function FlashCore() {
+  const queryClient = useQueryClient();
+  const [user, setUser] = useState(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [sessionScore, setSessionScore] = useState({ correct: 0, incorrect: 0 });
+  const [reviewedCards, setReviewedCards] = useState(new Set());
+
+  useEffect(() => {
+    loadUser();
+  }, []);
+
+  const loadUser = async () => {
+    try {
+      const currentUser = await base44.auth.me();
+      setUser(currentUser);
+    } catch (error) {
+      base44.auth.redirectToLogin();
+    }
+  };
+
+  const { data: flashcards = [], isLoading } = useQuery({
+    queryKey: ['flashcards', user?.id],
+    queryFn: () => base44.entities.Flashcard.filter({ user_id: user?.id }, '-created_date'),
+    enabled: !!user,
+    initialData: []
+  });
+
+  const updateMasteryMutation = useMutation({
+    mutationFn: async ({ cardId, correct }) => {
+      const card = flashcards.find(c => c.id === cardId);
+      if (!card) return;
+
+      const newMastery = Math.min(100, Math.max(0, 
+        (card.mastery_level || 0) + (correct ? 10 : -5)
+      ));
+
+      const nextReviewDate = new Date();
+      nextReviewDate.setDate(nextReviewDate.getDate() + Math.floor(newMastery / 20));
+
+      return base44.entities.Flashcard.update(cardId, {
+        mastery_level: newMastery,
+        last_reviewed: new Date().toISOString(),
+        review_count: (card.review_count || 0) + 1,
+        next_review_date: nextReviewDate.toISOString().split('T')[0]
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['flashcards'] });
+    }
+  });
+
+  const handleAnswer = (correct) => {
+    const currentCard = flashcards[currentIndex];
+    if (!currentCard) return;
+
+    updateMasteryMutation.mutate({ cardId: currentCard.id, correct });
+    setSessionScore(prev => ({
+      ...prev,
+      [correct ? 'correct' : 'incorrect']: prev[correct ? 'correct' : 'incorrect'] + 1
+    }));
+    setReviewedCards(prev => new Set([...prev, currentCard.id]));
+
+    // Move to next card
+    setTimeout(() => {
+      setIsFlipped(false);
+      if (currentIndex < flashcards.length - 1) {
+        setCurrentIndex(currentIndex + 1);
+      }
+    }, 500);
+  };
+
+  const currentCard = flashcards[currentIndex];
+  const progress = flashcards.length > 0 ? ((currentIndex + 1) / flashcards.length) * 100 : 0;
+  const sessionComplete = reviewedCards.size === flashcards.length && flashcards.length > 0;
+
+  const difficultyColors = {
+    easy: 'bg-green-500/20 text-green-400 border-green-500/50',
+    medium: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50',
+    hard: 'bg-red-500/20 text-red-400 border-red-500/50'
+  };
+
+  if (sessionComplete) {
+    const accuracy = sessionScore.correct + sessionScore.incorrect > 0
+      ? Math.round((sessionScore.correct / (sessionScore.correct + sessionScore.incorrect)) * 100)
+      : 0;
+
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#0A0E27] to-[#050810] p-4 md:p-8 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-2xl w-full"
+        >
+          <Card className="glassmorphism border-white/10 p-8 text-center">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.2, type: 'spring' }}
+            >
+              <Trophy className="w-24 h-24 text-[#00E6FF] mx-auto mb-6" />
+            </motion.div>
+            
+            <h2 className="text-4xl font-bold text-white mb-4">Session Complete!</h2>
+            <p className="text-gray-400 mb-8">Great work on your FlashCore study session</p>
+
+            <div className="grid grid-cols-3 gap-4 mb-8">
+              <div className="glassmorphism p-6 rounded-xl">
+                <div className="text-3xl font-bold text-[#00E6FF] mb-2">{flashcards.length}</div>
+                <div className="text-sm text-gray-400">Cards Reviewed</div>
+              </div>
+              <div className="glassmorphism p-6 rounded-xl">
+                <div className="text-3xl font-bold text-green-400 mb-2">{sessionScore.correct}</div>
+                <div className="text-sm text-gray-400">Correct</div>
+              </div>
+              <div className="glassmorphism p-6 rounded-xl">
+                <div className="text-3xl font-bold text-white mb-2">{accuracy}%</div>
+                <div className="text-sm text-gray-400">Accuracy</div>
+              </div>
+            </div>
+
+            <div className="flex gap-4 justify-center">
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-[#00E6FF]/30 text-[#00E6FF] hover:bg-[#00E6FF]/10"
+                onClick={() => {
+                  setCurrentIndex(0);
+                  setSessionScore({ correct: 0, incorrect: 0 });
+                  setReviewedCards(new Set());
+                  setIsFlipped(false);
+                }}
+              >
+                <RotateCcw className="w-5 h-5 mr-2" />
+                Study Again
+              </Button>
+              <Button
+                size="lg"
+                className="bg-gradient-to-r from-[#00E6FF] to-[#8A2BE2]"
+                onClick={() => window.location.href = '/dashboard'}
+              >
+                Back to Dashboard
+              </Button>
+            </div>
+          </Card>
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-[#0A0E27] to-[#050810] p-4 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-8"
+        >
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Zap className="w-10 h-10 text-[#00E6FF]" />
+            <h1 className="text-4xl md:text-5xl font-bold text-white">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E6FF] to-[#8A2BE2]">
+                FlashCore
+              </span>
+            </h1>
+          </div>
+          <p className="text-gray-400">3D swipable flashcards with spaced repetition</p>
+        </motion.div>
+
+        {/* Progress Bar */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="glassmorphism p-4 rounded-xl mb-6"
+        >
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm text-gray-400">Progress</span>
+            <span className="text-sm text-white font-semibold">
+              {currentIndex + 1} / {flashcards.length}
+            </span>
+          </div>
+          <Progress value={progress} className="h-2" />
+          
+          <div className="flex justify-between items-center mt-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-400" />
+                <span className="text-white font-semibold">{sessionScore.correct}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <XCircle className="w-5 h-5 text-red-400" />
+                <span className="text-white font-semibold">{sessionScore.incorrect}</span>
+              </div>
+            </div>
+            <Badge className={currentCard ? difficultyColors[currentCard.difficulty] : ''}>
+              {currentCard?.difficulty || 'medium'}
+            </Badge>
+          </div>
+        </motion.div>
+
+        {/* Flashcard */}
+        {flashcards.length > 0 && currentCard ? (
+          <div className="flex justify-center mb-8">
+            <motion.div
+              initial={{ opacity: 0, rotateY: 90 }}
+              animate={{ opacity: 1, rotateY: 0 }}
+              key={currentCard.id}
+              className="w-full max-w-2xl"
+              style={{ perspective: 1000 }}
+            >
+              <motion.div
+                animate={{ rotateY: isFlipped ? 180 : 0 }}
+                transition={{ duration: 0.6 }}
+                style={{ transformStyle: 'preserve-3d' }}
+                className="relative h-96 cursor-pointer"
+                onClick={() => setIsFlipped(!isFlipped)}
+              >
+                {/* Front */}
+                <Card
+                  className="absolute inset-0 glassmorphism border-white/10 hover-glow"
+                  style={{
+                    backfaceVisibility: 'hidden',
+                    transform: 'rotateY(0deg)'
+                  }}
+                >
+                  <CardContent className="h-full flex flex-col items-center justify-center p-8">
+                    <Target className="w-12 h-12 text-[#00E6FF] mb-6" />
+                    <h3 className="text-2xl font-bold text-white text-center mb-4">
+                      {currentCard.question}
+                    </h3>
+                    <p className="text-gray-400 text-sm">Tap to reveal answer</p>
+                  </CardContent>
+                </Card>
+
+                {/* Back */}
+                <Card
+                  className="absolute inset-0 glassmorphism border-white/10 hover-glow"
+                  style={{
+                    backfaceVisibility: 'hidden',
+                    transform: 'rotateY(180deg)'
+                  }}
+                >
+                  <CardContent className="h-full flex flex-col items-center justify-center p-8">
+                    <Zap className="w-12 h-12 text-[#8A2BE2] mb-6" />
+                    <p className="text-xl text-gray-200 text-center">
+                      {currentCard.answer}
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </motion.div>
+          </div>
+        ) : (
+          <div className="text-center py-20">
+            <Zap className="w-20 h-20 text-gray-600 mx-auto mb-6" />
+            <h3 className="text-2xl font-bold text-white mb-2">No flashcards yet</h3>
+            <p className="text-gray-400">Generate flashcards from your courses to start studying!</p>
+          </div>
+        )}
+
+        {/* Controls */}
+        {isFlipped && currentCard && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex justify-center gap-4"
+          >
+            <Button
+              size="lg"
+              variant="outline"
+              className="border-red-500/30 text-red-400 hover:bg-red-500/10 px-8"
+              onClick={() => handleAnswer(false)}
+            >
+              <XCircle className="w-5 h-5 mr-2" />
+              Didn't Know
+            </Button>
+            <Button
+              size="lg"
+              className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 px-8"
+              onClick={() => handleAnswer(true)}
+            >
+              <CheckCircle className="w-5 h-5 mr-2" />
+              Got It!
+            </Button>
+          </motion.div>
+        )}
+
+        {/* Navigation */}
+        <div className="flex justify-between items-center mt-8">
+           <Button
+            variant="outline"
+            className="border-white/10 text-white"
+            onClick={() => {
+              setIsFlipped(false);
+              setCurrentIndex(Math.max(0, currentIndex - 1));
+            }}
+            disabled={currentIndex === 0}
+          >
+            <ChevronLeft className="w-5 h-5 mr-2" />
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            className="border-white/10 text-white"
+            onClick={() => {
+              setIsFlipped(false);
+              setCurrentIndex(Math.min(flashcards.length - 1, currentIndex + 1));
+            }}
+            disabled={currentIndex === flashcards.length - 1}
+          >
+            Next
+            <ChevronRight className="w-5 h-5 ml-2" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

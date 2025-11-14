@@ -1,0 +1,72 @@
+{
+  "name": "QuizResult",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "User who took the quiz"
+    },
+    "course_id": {
+      "type": "string",
+      "description": "Associated course"
+    },
+    "lesson_id": {
+      "type": "string",
+      "description": "Associated lesson (optional)"
+    },
+    "quiz_type": {
+      "type": "string",
+      "enum": [
+        "multiple_choice",
+        "short_answer",
+        "mixed"
+      ],
+      "default": "multiple_choice"
+    },
+    "questions": {
+      "type": "array",
+      "description": "Quiz questions and answers",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "correct_answer": {
+            "type": "string"
+          },
+          "user_answer": {
+            "type": "string"
+          },
+          "is_correct": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "score": {
+      "type": "number",
+      "description": "Percentage score"
+    },
+    "time_taken_seconds": {
+      "type": "number",
+      "description": "Time taken to complete quiz"
+    },
+    "total_questions": {
+      "type": "number"
+    },
+    "correct_answers": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "user_id",
+    "course_id"
+  ]
+}

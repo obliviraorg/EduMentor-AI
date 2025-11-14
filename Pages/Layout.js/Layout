@@ -1,0 +1,289 @@
+
+import React, { useState, useEffect } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { base44 } from "@/api/base44Client";
+import { 
+  Home, BookOpen, Zap, Brain, User, 
+  Settings, LogOut, Menu, X, GraduationCap
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { motion, AnimatePresence } from "framer-motion";
+
+export default function Layout({ children, currentPageName }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    loadUser();
+  }, []);
+
+  const loadUser = async () => {
+    try {
+      const currentUser = await base44.auth.me();
+      setUser(currentUser);
+    } catch (error) {
+      console.error("User not authenticated");
+    }
+  };
+
+  const handleLogout = async () => {
+    await base44.auth.logout();
+    navigate(createPageUrl("Login")); // Redirect to login after logout
+  };
+
+  const navItems = [
+    { name: "Dashboard", path: "Dashboard", icon: Home },
+    { name: "Courses", path: "Courses", icon: BookOpen },
+    { name: "Visual Learning", path: "VisualLearning", icon: Brain }, // Added new item
+    { name: "AI Trainer", path: "AITrainer", icon: Brain },
+    { name: "FlashCore", path: "FlashCore", icon: Zap },
+    { name: "Profile", path: "Profile", icon: User }
+  ];
+
+  const isActive = (path) => location.pathname === createPageUrl(path);
+
+  return (
+    <>
+      {/* Cyber particle field background */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+        
+        :root {
+          --electric-cyan: #00E6FF;
+          --cyber-violet: #8A2BE2;
+          --obsidian: #0A0E27;
+          --obsidian-light: #1A1E3F;
+          --glass-white: rgba(255, 255, 255, 0.1);
+          --neon-glow: 0 0 20px var(--electric-cyan);
+        }
+
+        body {
+          font-family: 'Inter', sans-serif;
+          background: var(--obsidian);
+          overflow-x: hidden;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+          font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .particle-field {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          pointer-events: none;
+          z-index: 0;
+          background: 
+            radial-gradient(ellipse at top, rgba(138, 43, 226, 0.15), transparent),
+            radial-gradient(ellipse at bottom, rgba(0, 230, 255, 0.1), transparent),
+            linear-gradient(180deg, #0A0E27 0%, #050810 100%);
+        }
+
+        .particle-field::before {
+          content: '';
+          position: absolute;
+          width: 200%;
+          height: 200%;
+          background-image: 
+            radial-gradient(2px 2px at 20% 30%, rgba(0, 230, 255, 0.3), transparent),
+            radial-gradient(2px 2px at 60% 70%, rgba(138, 43, 226, 0.3), transparent),
+            radial-gradient(1px 1px at 50% 50%, rgba(255, 255, 255, 0.2), transparent),
+            radial-gradient(1px 1px at 80% 10%, rgba(0, 230, 255, 0.2), transparent);
+          background-size: 200px 200px, 300px 300px, 150px 150px, 250px 250px;
+          background-position: 0 0, 40px 60px, 130px 270px, 70px 100px;
+          animation: particleFloat 20s linear infinite;
+        }
+
+        @keyframes particleFloat {
+          0% { transform: translate(0, 0); }
+          100% { transform: translate(-50%, -50%); }
+        }
+
+        .glassmorphism {
+          background: rgba(255, 255, 255, 0.03);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: 
+            0 8px 32px 0 rgba(0, 0, 0, 0.37),
+            inset 0 1px 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .neon-border {
+          border: 1px solid var(--electric-cyan);
+          box-shadow: 
+            0 0 10px rgba(0, 230, 255, 0.3),
+            inset 0 0 10px rgba(0, 230, 255, 0.1);
+        }
+
+        .glow-text {
+          text-shadow: 0 0 20px rgba(0, 230, 255, 0.5);
+        }
+
+        .hover-glow {
+          transition: all 0.3s ease;
+        }
+
+        .hover-glow:hover {
+          box-shadow: 0 0 30px rgba(0, 230, 255, 0.4);
+          transform: translateY(-2px);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: var(--obsidian-light);
+        }
+
+        ::-webkit-scrollbar-thumb {
+          background: linear-gradient(180deg, var(--electric-cyan), var(--cyber-violet));
+          border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+          background: var(--electric-cyan);
+        }
+      `}</style>
+
+      <div className="particle-field" />
+
+      <div className="relative min-h-screen flex flex-col">
+        {/* Top Navigation Bar */}
+        <motion.nav
+          initial={{ y: -100 }}
+          animate={{ y: 0 }}
+          className="glassmorphism sticky top-0 z-50 border-b border-white/10"
+        >
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              {/* Logo */}
+              <Link to={createPageUrl("Landing")} className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#00E6FF] to-[#8A2BE2] flex items-center justify-center">
+                  <GraduationCap className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-white glow-text">EduMentor AI</h1>
+                  <p className="text-xs text-[#00E6FF]">Learn Faster. Remember Smarter.</p>
+                </div>
+              </Link>
+
+              {/* Desktop Navigation */}
+              <div className="hidden md:flex items-center gap-6">
+                {navItems.map((item) => (
+                  <Link
+                    key={item.path}
+                    to={createPageUrl(item.path)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                      isActive(item.path)
+                        ? "bg-gradient-to-r from-[#00E6FF]/20 to-[#8A2BE2]/20 text-[#00E6FF] border border-[#00E6FF]/30"
+                        : "text-gray-300 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    <item.icon className="w-4 h-4" />
+                    <span className="font-medium">{item.name}</span>
+                  </Link>
+                ))}
+              </div>
+
+              {/* User Actions */}
+              <div className="hidden md:flex items-center gap-4">
+                {user && (
+                  <div className="flex items-center gap-3">
+                    <Link to={createPageUrl("Profile")}>
+                      <Button variant="ghost" size="icon" className="text-gray-300 hover:text-white">
+                        <Settings className="w-5 h-5" />
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleLogout}
+                      className="text-gray-300 hover:text-white"
+                    >
+                      <LogOut className="w-5 h-5" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Mobile Menu Button */}
+              <button
+                className="md:hidden text-white"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              >
+                {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Menu */}
+          <AnimatePresence>
+            {mobileMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="md:hidden border-t border-white/10"
+              >
+                <div className="px-4 py-4 space-y-2">
+                  {navItems.map((item) => (
+                    <Link
+                      key={item.path}
+                      to={createPageUrl(item.path)}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-lg ${
+                        isActive(item.path)
+                          ? "bg-gradient-to-r from-[#00E6FF]/20 to-[#8A2BE2]/20 text-[#00E6FF]"
+                          : "text-gray-300"
+                      }`}
+                    >
+                      <item.icon className="w-5 h-5" />
+                      <span>{item.name}</span>
+                    </Link>
+                  ))}
+                  
+                  {user && (
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:text-white"
+                    >
+                      <LogOut className="w-5 h-5" />
+                      <span>Logout</span>
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.nav>
+
+        {/* Main Content */}
+        <main className="flex-1 relative z-10">
+          {children}
+        </main>
+
+        {/* Footer */}
+        <footer className="glassmorphism border-t border-white/10 py-8 relative z-10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center text-gray-400">
+              <p className="text-sm">
+                © 2025 EduMentor AI. Cognitive analytics powered by neural text synthesis.
+              </p>
+              <p className="text-xs mt-2">
+                GPU-accelerated learning. WebGL-enhanced knowledge graphs.
+              </p>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </>
+  );
+}

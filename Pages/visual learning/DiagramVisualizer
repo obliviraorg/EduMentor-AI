@@ -1,0 +1,141 @@
+import React from 'react';
+import { motion } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+
+export default function DiagramVisualizer({ diagram, index }) {
+  if (!diagram) return null;
+
+  const { title, type, nodes = [], connections = [] } = diagram;
+
+  // Calculate positions based on diagram type
+  const getNodePosition = (nodeIndex, totalNodes) => {
+    if (type === 'flowchart') {
+      const row = Math.floor(nodeIndex / 3);
+      const col = nodeIndex % 3;
+      return {
+        x: 150 + col * 250,
+        y: 100 + row * 150
+      };
+    } else if (type === 'hierarchy') {
+      const level = Math.floor(Math.log2(nodeIndex + 1));
+      const posInLevel = nodeIndex - (Math.pow(2, level) - 1);
+      const maxInLevel = Math.pow(2, level);
+      return {
+        x: 400 + (posInLevel - maxInLevel / 2) * (600 / maxInLevel),
+        y: 80 + level * 120
+      };
+    } else {
+      // concept_map - circular layout
+      const angle = (nodeIndex * 2 * Math.PI) / totalNodes;
+      return {
+        x: 400 + 250 * Math.cos(angle),
+        y: 250 + 200 * Math.sin(angle)
+      };
+    }
+  };
+
+  const getNodeColor = (nodeType) => {
+    switch (nodeType) {
+      case 'start': return '#00E6FF';
+      case 'end': return '#8A2BE2';
+      case 'process': return '#00CC88';
+      default: return '#00E6FF';
+    }
+  };
+
+  const nodePositions = nodes.map((_, idx) => getNodePosition(idx, nodes.length));
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.1 }}
+    >
+      <Card className="glassmorphism border-white/10">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-white">{title}</CardTitle>
+            <Badge className="bg-gradient-to-r from-[#00E6FF]/20 to-[#8A2BE2]/20 border border-[#00E6FF]/50 text-[#00E6FF]">
+              {type.replace('_', ' ')}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="relative w-full h-[500px] bg-gradient-to-br from-[#0A0E27] to-[#1A1E3F] rounded-xl overflow-hidden">
+            <svg width="100%" height="100%" viewBox="0 0 800 500">
+              {/* Draw connections */}
+              {connections.map((conn, idx) => {
+                const fromNode = nodes.findIndex(n => n.id === conn.from);
+                const toNode = nodes.findIndex(n => n.id === conn.to);
+                
+                if (fromNode === -1 || toNode === -1) return null;
+
+                const from = nodePositions[fromNode];
+                const to = nodePositions[toNode];
+
+                return (
+                  <motion.g key={idx}>
+                    <motion.line
+                      x1={from.x}
+                      y1={from.y}
+                      x2={to.x}
+                      y2={to.y}
+                      stroke="#00E6FF"
+                      strokeWidth="2"
+                      opacity="0.4"
+                      initial={{ pathLength: 0 }}
+                      animate={{ pathLength: 1 }}
+                      transition={{ duration: 1, delay: idx * 0.1 }}
+                    />
+                    {/* Arrow head */}
+                    <motion.polygon
+                      points={`${to.x},${to.y} ${to.x - 8},${to.y - 5} ${to.x - 8},${to.y + 5}`}
+                      fill="#00E6FF"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 0.6 }}
+                      transition={{ delay: 0.5 + idx * 0.1 }}
+                    />
+                  </motion.g>
+                );
+              })}
+
+              {/* Draw nodes */}
+              {nodes.map((node, idx) => {
+                const pos = nodePositions[idx];
+                const color = getNodeColor(node.type);
+
+                return (
+                  <g key={node.id}>
+                    <motion.rect
+                      x={pos.x - 70}
+                      y={pos.y - 35}
+                      width="140"
+                      height="70"
+                      rx="10"
+                      fill={color}
+                      opacity="0.2"
+                      stroke={color}
+                      strokeWidth="2"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', delay: 0.3 + idx * 0.1 }}
+                      filter={`drop-shadow(0 0 10px ${color})`}
+                    />
+                    <foreignObject x={pos.x - 65} y={pos.y - 30} width="130" height="60">
+                      <div className="flex items-center justify-center h-full text-center p-2">
+                        <p className="text-white text-xs font-medium leading-tight">
+                          {node.label}
+                        </p>
+                      </div>
+                    </foreignObject>
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}

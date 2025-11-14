@@ -1,0 +1,145 @@
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Clock, Users, Star, TrendingUp } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+
+export default function CourseCard3D({ course, index }) {
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+  const difficultyColors = {
+    beginner: 'bg-green-500/20 text-green-400 border-green-500/50',
+    intermediate: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50',
+    advanced: 'bg-red-500/20 text-red-400 border-red-500/50'
+  };
+
+  const handleMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 20;
+    const y = ((e.clientY - rect.top) / rect.height - 0.5) * 20;
+    setMousePosition({ x, y });
+  };
+
+  const handleMouseLeave = () => {
+    setMousePosition({ x: 0, y: 0 });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 50 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.1 }}
+      whileHover={{ y: -10 }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      style={{
+        transform: `perspective(1000px) rotateX(${mousePosition.y * 0.5}deg) rotateY(${mousePosition.x * 0.5}deg)`,
+        transition: 'transform 0.2s ease-out'
+      }}
+    >
+      <Link to={createPageUrl(`CourseDetail?id=${course.id}`)}>
+        <Card className="glassmorphism hover-glow cursor-pointer overflow-hidden group border-white/10 h-full relative">
+          {/* Animated gradient overlay */}
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+            <div 
+              className="absolute inset-0"
+              style={{
+                background: 'linear-gradient(135deg, rgba(0, 230, 255, 0.1) 0%, rgba(138, 43, 226, 0.1) 100%)',
+                animation: 'gradient-shift 3s ease infinite'
+              }}
+            />
+          </div>
+
+          {/* Course Cover with Gradient Overlay */}
+          <div className="relative h-48 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#00E6FF]/20 via-[#8A2BE2]/20 to-transparent z-10" />
+            {course.cover_image ? (
+              <img 
+                src={course.cover_image} 
+                alt={course.title}
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-[#00E6FF] to-[#8A2BE2] flex items-center justify-center">
+                <TrendingUp className="w-16 h-16 text-white/50" />
+              </div>
+            )}
+            
+            {/* Difficulty Badge */}
+            <div className="absolute top-3 right-3 z-20">
+              <Badge className={`${difficultyColors[course.difficulty]} border`}>
+                {course.difficulty}
+              </Badge>
+            </div>
+
+            {/* Shine effect on hover */}
+            <div 
+              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700"
+              style={{
+                background: 'linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%)',
+                transform: 'translateX(-100%)',
+                animation: 'shine 2s ease-in-out infinite'
+              }}
+            />
+          </div>
+
+          <CardHeader className="space-y-2 relative z-10">
+            <h3 className="text-xl font-bold text-white group-hover:text-[#00E6FF] transition-colors line-clamp-2">
+              {course.title}
+            </h3>
+            <p className="text-sm text-gray-400 line-clamp-2">
+              {course.description}
+            </p>
+          </CardHeader>
+
+          <CardContent className="space-y-4 relative z-10">
+            {/* Tags */}
+            {course.tags && course.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {course.tags.slice(0, 3).map((tag, idx) => (
+                  <Badge 
+                    key={idx} 
+                    variant="outline" 
+                    className="text-xs border-[#00E6FF]/30 text-[#00E6FF]"
+                  >
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            )}
+
+            {/* Stats */}
+            <div className="grid grid-cols-3 gap-3 pt-3 border-t border-white/10">
+              <div className="flex items-center gap-1">
+                <Clock className="w-4 h-4 text-[#00E6FF]" />
+                <span className="text-xs text-gray-300">{course.estimated_hours || 0}h</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Users className="w-4 h-4 text-[#8A2BE2]" />
+                <span className="text-xs text-gray-300">{course.enrollment_count || 0}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Star className="w-4 h-4 text-yellow-400" />
+                <span className="text-xs text-gray-300">{course.rating || 0}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+
+      <style>{`
+        @keyframes gradient-shift {
+          0%, 100% { transform: translateX(-100%); }
+          50% { transform: translateX(100%); }
+        }
+
+        @keyframes shine {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(200%); }
+        }
+      `}</style>
+    </motion.div>
+  );
+}

@@ -1,0 +1,72 @@
+{
+  "name": "SmartNote",
+  "type": "object",
+  "properties": {
+    "course_id": {
+      "type": "string",
+      "description": "Associated course ID"
+    },
+    "lesson_id": {
+      "type": "string",
+      "description": "Associated lesson ID"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "User who generated these notes"
+    },
+    "key_concepts": {
+      "type": "array",
+      "description": "3 key concepts extracted",
+      "items": {
+        "type": "string"
+      }
+    },
+    "practical_examples": {
+      "type": "array",
+      "description": "2 real-world examples",
+      "items": {
+        "type": "string"
+      }
+    },
+    "memory_tip": {
+      "type": "string",
+      "description": "Single memory aid or mnemonic"
+    },
+    "seven_day_routine": {
+      "type": "array",
+      "description": "7-day micro-routine for retention",
+      "items": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "number"
+          },
+          "task": {
+            "type": "string"
+          },
+          "duration_minutes": {
+            "type": "number"
+          },
+          "completed": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    },
+    "custom_notes": {
+      "type": "string",
+      "description": "User's additional notes"
+    },
+    "is_favorite": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "course_id",
+    "lesson_id",
+    "user_id"
+  ]
+}
+

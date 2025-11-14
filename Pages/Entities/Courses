@@ -1,0 +1,114 @@
+{
+  "name": "Course",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Course title"
+    },
+    "description": {
+      "type": "string",
+      "description": "Course description"
+    },
+    "mentor_id": {
+      "type": "string",
+      "description": "ID of the mentor who created this course"
+    },
+    "cover_image": {
+      "type": "string",
+      "description": "Course cover image URL"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Course tags for filtering"
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": [
+        "beginner",
+        "intermediate",
+        "advanced"
+      ],
+      "default": "intermediate"
+    },
+    "estimated_hours": {
+      "type": "number",
+      "description": "Estimated completion time in hours"
+    },
+    "syllabus": {
+      "type": "array",
+      "description": "Course modules and lessons structure",
+      "items": {
+        "type": "object",
+        "properties": {
+          "module_id": {
+            "type": "string"
+          },
+          "module_title": {
+            "type": "string"
+          },
+          "learning_objectives": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lessons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "lesson_id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "video",
+                    "reading",
+                    "quiz",
+                    "interactive"
+                  ]
+                },
+                "duration_minutes": {
+                  "type": "number"
+                },
+                "video_url": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "transcript": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "enrollment_count": {
+      "type": "number",
+      "default": 0
+    },
+    "rating": {
+      "type": "number",
+      "default": 0
+    },
+    "is_published": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "title",
+    "description"
+  ]
+}

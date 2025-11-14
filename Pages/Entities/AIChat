@@ -1,0 +1,48 @@
+{
+  "name": "AIChat",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "User conducting the chat session"
+    },
+    "conversation_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ]
+          },
+          "content": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "description": "Full conversation history"
+    },
+    "suggested_tasks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "AI-generated follow-up tasks"
+    },
+    "session_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this session is still active"
+    }
+  },
+  "required": [
+    "user_id"
+  ]
+}
