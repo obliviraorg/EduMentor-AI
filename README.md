@@ -56,4 +56,4 @@ With adaptive intelligence, deep learning personalization, and conversational AI
 --
 
 ## 🪄 Try It Now
-👉 **[Launch App](https://edu-mentor-ai-2164ee70.base44.app/)**
+👉 **[Launch App](https://reeledtech-app.vercel.app/)**
